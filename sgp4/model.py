@@ -1,9 +1,12 @@
 """The Satellite class."""
 
 from sgp4.earth_gravity import wgs72old, wgs72, wgs84
-from sgp4.ext import invjday, jday
-from sgp4.io import twoline2rv
+from sgp4.ext import days2mdhms, jday
+from sgp4.functions import jday as jday2
+from sgp4.io import twoline2rv, twoline_parse
 from sgp4.propagation import sgp4, sgp4init
+from sgp4.propagation_np import sgp4deploy, sgp4_np
+import numpy as np
 
 WGS72OLD = 0
 WGS72 = 1
@@ -33,7 +36,7 @@ class Satrec(object):
         'pho', 'pinco', 'plo', 'radiusearthkm', 'revnum', 'satnum', 'se2',
         'se3', 'sgh2', 'sgh3', 'sgh4', 'sh2', 'sh3', 'si2', 'si3', 'sinmao',
         'sl2', 'sl3', 'sl4', 't', 't2cof', 't3cof', 't4cof', 't5cof', 'tumin',
-        'x1mth2', 'x7thm1', 'xfact', 'xgh2', 'xgh3', 'xgh4',
+        'whichconst', 'x1mth2', 'x7thm1', 'xfact', 'xgh2', 'xgh3', 'xgh4',
         'xh2', 'xh3', 'xi2', 'xi3', 'xke', 'xl2', 'xl3', 'xl4', 'xlamo',
         'xlcof', 'xli', 'xmcof', 'xni', 'zmol', 'zmos',
         'jdsatepochF'
@@ -73,22 +76,14 @@ class Satrec(object):
     def sgp4init(self, whichconst, opsmode, satnum, epoch, bstar,
                  ndot, nddot, ecco, argpo, inclo, mo, no_kozai, nodeo):
         whichconst = gravity_constants[whichconst]
-        whole, fraction = divmod(epoch, 1.0)
-        whole_jd = whole + 2433281.5
 
-        # Go out on a limb: if `epoch` has no decimal digits past the 8
-        # decimal places stored in a TLE, then assume the user is trying
-        # to specify an exact decimal fraction.
-        if round(epoch, 8) == epoch:
-            fraction = round(fraction, 8)
+        y, m, d, H, M, S = invjday(epoch + 2433281.5)
+        jan0epoch = jday(y, 1, 0, 0, 0, 0.0) - 2433281.5
 
-        self.jdsatepoch = whole_jd
-        self.jdsatepochF = fraction
-
-        y, m, d, H, M, S = invjday(whole_jd)
-        jan0 = jday(y, 1, 0, 0, 0, 0.0)
-        self.epochyr = y % 100
-        self.epochdays = whole_jd - jan0 + fraction
+        self.epochyr = y % 1000
+        self.epochdays = epoch - jan0epoch
+        self.jdsatepoch, self.jdsatepochF = divmod(epoch, 1.0)
+        self.jdsatepoch += 2433281.5
 
         sgp4init(whichconst, opsmode, satnum, epoch, bstar, ndot, nddot,
                  ecco, argpo, inclo, mo, no_kozai, nodeo, self)
@@ -180,7 +175,41 @@ class SatrecArray(object):
         return e, r, v
 
 class Satellite(object):
-    """The old Satellite object, for compatibility with sgp4 1.x."""
+    """The old Satellite object for compatibility with sgp4 1.x.
+
+    Most of this class's hundred-plus attributes are intermediate values
+    of interest only to the propagation algorithm itself.  Here are the
+    attributes set by ``sgp4.io.twoline2rv()`` in which users are likely
+    to be interested:
+
+    ``satnum``
+        Unique satellite number given in the TLE file.
+    ``epochyr``
+        Full four-digit year of this element set's epoch moment.
+    ``epochdays``
+        Fractional days into the year of the epoch moment.
+    ``jdsatepoch``
+        Julian date of the epoch (computed from ``epochyr`` and ``epochdays``).
+    ``ndot``
+        First time derivative of the mean motion (ignored by SGP4).
+    ``nddot``
+        Second time derivative of the mean motion (ignored by SGP4).
+    ``bstar``
+        Ballistic drag coefficient B* in inverse earth radii.
+    ``inclo``
+        Inclination in radians.
+    ``nodeo``
+        Right ascension of ascending node in radians.
+    ``ecco``
+        Eccentricity.
+    ``argpo``
+        Argument of perigee in radians.
+    ``mo``
+        Mean anomaly in radians.
+    ``no_kozai``
+        Mean motion in radians per minute.
+
+    """
     jdsatepochF = 0.0  # for compatibility with new Satrec; makes tests simpler
 
     # TODO: only offer this on legacy class we no longer document

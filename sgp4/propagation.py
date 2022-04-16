@@ -2057,5 +2057,16 @@ def getgravconst(whichconst):
            j3     =  -0.00000253215306;
            j4     =  -0.00000161098761;
            j3oj2  =  j3 / j2;
+          
+       elif whichconst == 'pz90':
+           #  ------------ wgs-84 constants ------------
+           mu     = 398600.4418;            #  in km3 / s2
+           radiusearthkm = 6378.136;     #  km
+           xke    = 60.0 / sqrt(radiusearthkm*radiusearthkm*radiusearthkm/mu);
+           tumin  = 1.0 / xke;
+           j2     =   1.0826258500E-03;
+           j3     =  -0.00000253215306;
+           j4     =  -0.00000161098761;
+           j3oj2  =  j3 / j2;
 
        return tumin, mu, radiusearthkm, xke, j2, j3, j4, j3oj2

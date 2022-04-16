@@ -11,3 +11,4 @@ EarthGravity = namedtuple(
 wgs72old = EarthGravity(*getgravconst('wgs72old'))
 wgs72 = EarthGravity(*getgravconst('wgs72'))
 wgs84 = EarthGravity(*getgravconst('wgs84'))
+pz90 = EarthGravity(*getgravconst('pz90'))
